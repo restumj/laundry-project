@@ -67,6 +67,24 @@
 {% endif %}
 
 {% if order.status.order_status_info == 'PROCESS' %}
+<details>
+  <summary>Ubah ongkos jemput / antar</summary>
+  <form method="post" action="/orders/{{ order.order_id }}/fees">
+    <div class="grid">
+      <label>Ongkos jemput (Rp)
+        <input type="text" inputmode="numeric" name="pickup_fee"
+               value="{{ form.pickup_fee if form.pickup_fee is defined else order.pickup_fee | int }}">
+      </label>
+      <label>Ongkos antar (Rp)
+        <input type="text" inputmode="numeric" name="delivery_fee"
+               value="{{ form.delivery_fee if form.delivery_fee is defined else order.delivery_fee | int }}">
+      </label>
+    </div>
+    <button type="submit" class="secondary">Simpan ongkos</button>
+    <small>Total dan poin yang didapat dihitung ulang. Hanya bisa selama status PROCESS.</small>
+  </form>
+</details>
+
 <form method="post" action="/orders/{{ order.order_id }}/finish" style="margin-top:1rem;">
   <button type="submit" class="contrast">Tandai selesai (FINISHED)</button>
   <small>Hanya berhasil jika order sudah lunas.</small>

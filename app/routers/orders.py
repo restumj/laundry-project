@@ -1,12 +1,15 @@
 from datetime import date
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+import math
+
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.database import get_db
+from app.routers.home import current_staff_id
 from app.models import Customer, Order, OrderDetail, Payment, PaymentMethod, Promo, Service, Staff
 from app.services import orders as order_service
 from app.services.payments import add_payment
@@ -18,8 +21,18 @@ from app.templating import templates
 router = APIRouter(prefix="/orders", tags=["orders"])
 
 # ---------------------------------------------------------------- daftar order
+PAGE_SIZE = 10
+
+
 @router.get("")
-def list_orders(request: Request, db: Session = Depends(get_db)):
+def list_orders(
+    request: Request,
+    page: int = Query(1, ge=1),
+    db: Session = Depends(get_db),
+):
+    total = db.scalar(select(func.count()).select_from(Order)) or 0
+    pages = max(1, math.ceil(total / PAGE_SIZE))
+    page = min(page, pages)          # halaman di luar batas -> halaman terakhir
     stmt = (
         select(Order)
         .options(
@@ -28,9 +41,15 @@ def list_orders(request: Request, db: Session = Depends(get_db)):
             selectinload(Order.payments),
         )
         .order_by(Order.order_date.desc(), Order.order_id.desc())
+        .limit(PAGE_SIZE)
+        .offset((page - 1) * PAGE_SIZE)
     )
     orders = db.scalars(stmt).all()
-    return templates.TemplateResponse(request, "orders_list.html", {"orders": orders})
+    return templates.TemplateResponse(
+        request,
+        "orders_list.html",
+        {"orders": orders, "page": page, "pages": pages, "total": total, "base_url": "/orders"},
+    )
 
 
 # ---------------------------------------------------------------- form order baru
@@ -65,7 +84,7 @@ def new_order_form(request: Request, db: Session = Depends(get_db)):
     form = {
         "cust_id": "",
         "cust_label": "",
-        "staff_id": "",
+        "staff_id": current_staff_id(request, db) or "",
         "order_estimation_date": "",
         "estimation_manual": False,
         "promo_code": "",
@@ -213,6 +232,7 @@ def _load_order_for_payment(db: Session, order_id: str) -> Order:
         .options(
             joinedload(Order.customer),
             joinedload(Order.status),
+            selectinload(Order.details),
             selectinload(Order.payments).joinedload(Payment.method),
         )
     )
@@ -238,6 +258,37 @@ def _payment_page(request, db, order, form, error=None, status_code=200):
 def payment_form(order_id: str, request: Request, db: Session = Depends(get_db)):
     order = _load_order_for_payment(db, order_id)
     return _payment_page(request, db, order, {"method": "", "amount": "", "settle": False})
+
+
+@router.post("/{order_id}/fees")
+def update_fees_route(
+    order_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    pickup_fee: str = Form("0"),
+    delivery_fee: str = Form("0"),
+):
+    order = _load_order_for_payment(db, order_id)
+    try:
+        order_service.update_order_fees(
+            db,
+            order,
+            parse_decimal(pickup_fee, "Ongkos jemput", default=Decimal("0")),
+            parse_decimal(delivery_fee, "Ongkos antar", default=Decimal("0")),
+        )
+        db.commit()
+    except OrderCalculationError as exc:
+        db.rollback()
+        order = _load_order_for_payment(db, order_id)
+        return _payment_page(
+            request, db, order,
+            {"method": "", "amount": "", "pickup_fee": pickup_fee, "delivery_fee": delivery_fee},
+            error=str(exc), status_code=400,
+        )
+    except Exception:
+        db.rollback()
+        raise
+    return RedirectResponse(f"/orders/{order_id}/pay", status_code=303)
 
 
 @router.post("/{order_id}/finish")

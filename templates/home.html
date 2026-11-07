@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Beranda{% endblock %}
+{% block content %}
+<h1>Laundry App</h1>
+
+<article>
+  <header><strong>Staff yang bertugas</strong></header>
+  <form method="post" action="/staff">
+    <label>Pilih staff
+      <select name="staff_id" required>
+        <option value="">-- pilih --</option>
+        {% for s in staff_list %}
+        <option value="{{ s.staff_id }}" {% if current == s.staff_id %}selected{% endif %}>{{ s.staff_name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">Mulai bertugas</button>
+    <small>Pilihan ini otomatis terisi di form order baru (berlaku 12 jam).</small>
+  </form>
+</article>
+
+<div class="grid">
+  <a href="/orders" role="button">Daftar order</a>
+  <a href="/orders/new" role="button" class="secondary">Order baru</a>
+</div>
+{% endblock %}

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Customer
+from app.services.points import points_on
 
 router = APIRouter(prefix="/customers", tags=["customers"])
 
@@ -28,7 +29,7 @@ def search_customers(q: str = "", db: Session = Depends(get_db)):
             )
         )
         .order_by(Customer.cust_name)
-        .limit(10)
+        .limit(30)
     )
     today = date.today()
     return [
@@ -36,7 +37,7 @@ def search_customers(q: str = "", db: Session = Depends(get_db)):
             "cust_id": c.cust_id,
             "cust_name": c.cust_name,
             "cust_phone": c.cust_phone,
-            "points": c.points_on(today),
+            "points": points_on(c.cust_point, c.cust_point_expired_date, today),
         }
         for c in db.scalars(stmt)
     ]

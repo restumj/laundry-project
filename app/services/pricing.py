@@ -182,3 +182,32 @@ def resolve_payment(
     if settle:
         return resolve_settlement(amount, balance_due), Decimal("0")
     return amount, Decimal("0")
+
+
+def recalc_with_fees(
+    subtotal: Decimal,
+    promo_discount: Decimal,
+    pickup_fee: Decimal,
+    delivery_fee: Decimal,
+    points_used: int,
+) -> PriceBreakdown:
+    """Hitung ulang total saat ongkos diubah. Promo dan poin terpakai tetap (promo hanya
+    dari subtotal layanan, jadi tidak ikut berubah)."""
+    if pickup_fee < 0 or delivery_fee < 0:
+        raise OrderCalculationError("Ongkos tidak boleh negatif.")
+    total_before_points = subtotal - promo_discount + pickup_fee + delivery_fee
+    if points_used > int(total_before_points // POINT_VALUE):
+        raise OrderCalculationError(
+            "Ongkos terlalu kecil: poin yang sudah dipakai melebihi tagihan baru."
+        )
+    total_price = total_before_points - POINT_VALUE * points_used
+    return PriceBreakdown(
+        subtotal=subtotal,
+        promo_discount=promo_discount,
+        pickup_fee=pickup_fee,
+        delivery_fee=delivery_fee,
+        total_before_points=total_before_points,
+        points_used=points_used,
+        total_price=total_price,
+        points_earned=int(total_price // POINT_EARN_UNIT),
+    )

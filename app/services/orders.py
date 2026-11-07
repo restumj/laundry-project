@@ -23,6 +23,7 @@ from app.services.pricing import (
     calculate_order,
     PriceBreakdown,
     line_subtotal,
+    recalc_with_fees,
 )
 
 STATUS_PROCESS = 1          # kode di tabel order_status
@@ -204,4 +205,30 @@ def finish_order(db: Session, order: Order) -> None:
             + "). Catat pembayaran dulu."
         )
     order.order_status = STATUS_FINISHED
+    db.flush()
+
+
+def update_order_fees(
+    db: Session, order: Order, pickup_fee: Decimal, delivery_fee: Decimal
+) -> None:
+    """Ubah ongkos jemput/antar order yang masih PROCESS.
+    Total, poin yang didapat, dan saldo poin pelanggan ikut disesuaikan (satu transaksi)."""
+    if order.order_status != STATUS_PROCESS:
+        raise OrderCalculationError("Order sudah selesai, ongkos tidak bisa diubah.")
+    subtotal = sum((d.sub_price for d in order.details), Decimal("0"))
+    new = recalc_with_fees(
+        subtotal, order.promo_discount_applied, pickup_fee, delivery_fee, order.points_used
+    )
+    if new.total_price < order.total_paid:
+        raise OrderCalculationError(
+            "Total baru lebih kecil dari yang sudah dibayar. Ongkos tidak bisa diturunkan sejauh itu."
+        )
+    delta = new.points_earned - order.points_earned
+    customer = order.customer
+    customer.cust_point = max(0, customer.cust_point + delta)
+
+    order.pickup_fee = pickup_fee
+    order.delivery_fee = delivery_fee
+    order.total_price = new.total_price
+    order.points_earned = new.points_earned
     db.flush()
