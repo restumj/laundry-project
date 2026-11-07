@@ -4,9 +4,9 @@
 <h1>Laundry App</h1>
 
 <article>
-  <header><strong>Staff yang bertugas</strong></header>
+  <header><strong>Siapa yang bertugas?</strong></header>
   <form method="post" action="/staff">
-    <label>Pilih staff
+    <label>Staff
       <select name="staff_id" required>
         <option value="">-- pilih --</option>
         {% for s in staff_list %}
@@ -15,12 +15,6 @@
       </select>
     </label>
     <button type="submit">Mulai bertugas</button>
-    <small>Pilihan ini otomatis terisi di form order baru (berlaku 12 jam).</small>
   </form>
 </article>
-
-<div class="grid">
-  <a href="/orders" role="button">Daftar order</a>
-  <a href="/orders/new" role="button" class="secondary">Order baru</a>
-</div>
 {% endblock %}

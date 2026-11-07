@@ -51,21 +51,12 @@
   </div>
   <small id="cust-info"></small>
 
-  <div class="grid">
-    <label>Staff
-      <select name="staff_id" required>
-        <option value="">-- pilih --</option>
-        {% for s in staff_list %}
-        <option value="{{ s.staff_id }}" {% if form.staff_id == s.staff_id %}selected{% endif %}>{{ s.staff_name }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label>Estimasi selesai
-      <input type="date" name="order_estimation_date" id="estimation" value="{{ form.order_estimation_date }}"
-             data-manual="{{ 'true' if form.estimation_manual else 'false' }}">
-      <small id="estimation-hint">Otomatis: hari ini + layanan terlama. Boleh diubah manual.</small>
-    </label>
-  </div>
+  <p>Staff bertugas: <strong>{{ staff.staff_name }}</strong> <small>(ganti di <a href="/">Beranda</a>)</small></p>
+
+  <label>Estimasi selesai
+    <input type="date" name="order_estimation_date" id="estimation" value="{{ form.order_estimation_date }}"
+           data-manual="{{ 'true' if form.estimation_manual else 'false' }}">
+  </label>
 
   <!-- ===== Layanan: baris dinamis ===== -->
   <h3>Layanan</h3>
@@ -207,7 +198,17 @@
         return;
       }
       results.replaceChildren(); active = -1; results.hidden = false;
-      if (data.length === 0) { addItem("Tidak ada pelanggan yang cocok.", null); return; }
+      if (data.length === 0) {
+        addItem("Tidak ada pelanggan yang cocok.", null);
+        const li = document.createElement("li");
+        li.style.cssText = "padding:.5rem .75rem; margin:0;";
+        const a = document.createElement("a");
+        a.href = "/customers?q=" + encodeURIComponent(q);
+        a.textContent = "Daftarkan pelanggan baru";
+        li.appendChild(a);
+        results.appendChild(li);
+        return;
+      }
       data.forEach(function (c) {
         addItem(c.cust_id + " - " + c.cust_name + " (" + c.cust_phone + ") - poin " + c.points, c);
       });
@@ -238,7 +239,6 @@
 
   // ---------- Estimasi otomatis: hari ini + layanan terlama ----------
   const est = document.getElementById("estimation");
-  const hint = document.getElementById("estimation-hint");
   const defaultDays = parseInt(form.dataset.defaultDays, 10);
 
   function addDays(iso, n) {
@@ -256,11 +256,9 @@
     });
     const n = days.length ? Math.max.apply(null, days) : defaultDays;
     est.value = addDays(form.dataset.today, n);
-    hint.textContent = "Otomatis: hari ini + " + n + " hari" +
-      (days.length ? " (layanan terlama)" : " (default)") + ". Boleh diubah manual.";
   }
 
-  est.addEventListener("input", function () { est.dataset.manual = "true"; hint.textContent = "Diubah manual."; });
+  est.addEventListener("input", function () { est.dataset.manual = "true"; });
 
   // ---------- Baris layanan dinamis ----------
   function updateRemoveButtons() {

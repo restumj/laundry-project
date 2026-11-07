@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Pelanggan{% endblock %}
+{% block content %}
+<h1>Pelanggan</h1>
+
+<form method="get" action="/customers" role="search">
+  <input type="search" name="q" value="{{ q }}" placeholder="Cek pelanggan: nama, nomor HP, atau ID" autofocus>
+  <button type="submit">Cari</button>
+</form>
+
+{% if searched %}
+  {% if rows %}
+  <table>
+    <thead><tr><th>ID</th><th>Nama</th><th>No. HP</th><th>Poin aktif</th><th></th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td>{{ r.c.cust_id }}</td>
+        <td>{{ r.c.cust_name }}</td>
+        <td>{{ r.c.cust_phone }}</td>
+        <td>{{ r.points }}</td>
+        <td><a href="/orders/new?cust_id={{ r.c.cust_id }}">Buat order</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p><strong>Tidak ada pelanggan yang cocok dengan "{{ q }}".</strong> Daftarkan di bawah.</p>
+  {% endif %}
+{% endif %}
+
+<article>
+  <header><strong>Daftarkan pelanggan baru</strong></header>
+  {% if error %}
+  <p style="color:#c62828;"><strong>Belum tersimpan:</strong> {{ error }}</p>
+  {% endif %}
+  <form method="post" action="/customers">
+    <div class="grid">
+      <label>Nama
+        <input type="text" name="name" value="{{ form.name }}" required maxlength="100">
+      </label>
+      <label>No. HP
+        <input type="text" inputmode="tel" name="phone" value="{{ form.phone }}" required placeholder="0812xxxxxxx">
+      </label>
+    </div>
+    <button type="submit">Daftarkan &amp; buat order</button>
+    <small>Poin awal 0. Masa berlaku poin dihitung sejak hari ini.</small>
+  </form>
+</article>
+{% endblock %}

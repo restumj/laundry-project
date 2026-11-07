@@ -7,7 +7,7 @@ import re
 from datetime import date, timedelta
 from typing import Iterable, Optional
 
-DEFAULT_ESTIMATION_DAYS = 3   # dipakai jika tidak ada varian yang terbaca
+DEFAULT_ESTIMATION_DAYS = 0   # dipakai jika tidak ada varian yang terbaca (0 = hari ini)
 
 _DAYS = re.compile(r"(\d+)\s*hari", re.IGNORECASE)
 _HOURS = re.compile(r"(\d+)\s*jam", re.IGNORECASE)

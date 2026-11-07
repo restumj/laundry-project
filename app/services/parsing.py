@@ -63,3 +63,24 @@ def parse_lines(service_ids: list[str], qtys: list[str], notes: list[str]):
         qty = parse_decimal(qty_text, f"Baris {i + 1}: qty")
         result.append((service_id, qty, note or None))
     return result
+
+
+def parse_name(text: str) -> str:
+    name = " ".join((text or "").split())      # rapikan spasi berlebih
+    if len(name) < 2:
+        raise OrderCalculationError("Nama pelanggan minimal 2 huruf.")
+    if len(name) > 100:
+        raise OrderCalculationError("Nama pelanggan maksimal 100 karakter.")
+    return name
+
+
+def parse_phone(text: str) -> str:
+    """Terima '0812-3456 789' atau '+62 812...' -> '08123456789' / '+62812...'."""
+    raw = (text or "").strip()
+    plus = raw.startswith("+")
+    digits = "".join(ch for ch in raw if ch.isdigit())
+    if any(not (ch.isdigit() or ch in " -()+") for ch in raw):
+        raise OrderCalculationError("Nomor telepon hanya boleh berisi angka.")
+    if not 8 <= len(digits) <= 15:
+        raise OrderCalculationError("Nomor telepon harus 8-15 angka.")
+    return ("+" if plus else "") + digits

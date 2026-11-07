@@ -25,8 +25,8 @@ def test_estimasi_pakai_layanan_terlama():
 
 
 def test_estimasi_default_jika_tidak_ada_yang_terbaca():
-    assert estimate_date(TODAY, ["Express"]) == date(2026, 11, 10)
-    assert estimate_date(TODAY, []) == date(2026, 11, 10)
+    assert estimate_date(TODAY, ["Express"]) == TODAY
+    assert estimate_date(TODAY, []) == TODAY
 
 
 def test_varian_tak_terbaca_diabaikan_jika_ada_yang_terbaca():

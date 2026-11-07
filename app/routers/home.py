@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -18,6 +18,16 @@ def current_staff_id(request: Request, db: Session):
     if staff_id and db.get(Staff, staff_id) is not None:
         return staff_id
     return None
+
+
+def require_staff(request: Request, db: Session = Depends(get_db)) -> Staff:
+    """Dependency: semua halaman kerja wajib punya staff bertugas.
+    Jika belum memilih, pengguna dialihkan (303) ke Beranda."""
+    staff_id = request.cookies.get(STAFF_COOKIE)
+    staff = db.get(Staff, staff_id) if staff_id else None
+    if staff is None:
+        raise HTTPException(status_code=303, headers={"Location": "/"})
+    return staff
 
 
 @router.get("/")

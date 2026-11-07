@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.database import get_db
-from app.routers.home import current_staff_id
+from app.routers.home import require_staff
 from app.models import Customer, Order, OrderDetail, Payment, PaymentMethod, Promo, Service, Staff
 from app.services import orders as order_service
 from app.services.payments import add_payment
@@ -18,7 +18,7 @@ from app.services.parsing import parse_date, parse_decimal, parse_int, parse_lin
 from app.services.pricing import OrderCalculationError, max_points_usable
 from app.templating import templates
 
-router = APIRouter(prefix="/orders", tags=["orders"])
+router = APIRouter(prefix="/orders", tags=["orders"], dependencies=[Depends(require_staff)])
 
 # ---------------------------------------------------------------- daftar order
 PAGE_SIZE = 10
@@ -55,7 +55,7 @@ def list_orders(
 # ---------------------------------------------------------------- form order baru
 # PENTING: route "/new" harus ditulis SEBELUM "/{order_id}".
 # Kalau terbalik, FastAPI mengira "new" adalah sebuah order_id.
-def _form_page(request, db, form, error=None, status_code=200):
+def _form_page(request, db, form, staff, error=None, status_code=200):
     services = db.scalars(
         select(Service).order_by(Service.service_name, Service.variant)
     ).all()
@@ -64,7 +64,7 @@ def _form_page(request, db, form, error=None, status_code=200):
         "error": error,
         "today": date.today().isoformat(),
         "default_days": DEFAULT_ESTIMATION_DAYS,
-        "staff_list": db.scalars(select(Staff).order_by(Staff.staff_name)).all(),
+        "staff": staff,
         # days = lama pengerjaan hasil baca teks variant (None jika tidak terbaca)
         "services": [{"sv": s, "days": parse_duration_days(s.variant)} for s in services],
         "promos": db.scalars(
@@ -80,12 +80,17 @@ def _form_page(request, db, form, error=None, status_code=200):
 
 
 @router.get("/new")
-def new_order_form(request: Request, db: Session = Depends(get_db)):
+def new_order_form(
+    request: Request,
+    cust_id: str = "",
+    db: Session = Depends(get_db),
+    staff: Staff = Depends(require_staff),
+):
+    customer = db.get(Customer, cust_id) if cust_id else None   # mis. setelah daftar pelanggan baru
     form = {
-        "cust_id": "",
-        "cust_label": "",
-        "staff_id": current_staff_id(request, db) or "",
-        "order_estimation_date": "",
+        "cust_id": customer.cust_id if customer else "",
+        "cust_label": f"{customer.cust_id} - {customer.cust_name}" if customer else "",
+        "order_estimation_date": date.today().isoformat(),
         "estimation_manual": False,
         "promo_code": "",
         "pickup_fee": "0",
@@ -97,7 +102,7 @@ def new_order_form(request: Request, db: Session = Depends(get_db)):
         "pay_full": False,
         "rows": [{"service_id": "", "qty": "", "notes": ""}],
     }
-    return _form_page(request, db, form)
+    return _form_page(request, db, form, staff)
 
 
 @router.post("/preview")
@@ -152,7 +157,7 @@ def create_order(
     request: Request,
     db: Session = Depends(get_db),
     cust_id: str = Form(...),
-    staff_id: str = Form(...),
+    staff: Staff = Depends(require_staff),
     order_estimation_date: str = Form(""),
     promo_code: str = Form(""),
     pickup_fee: str = Form("0"),
@@ -178,7 +183,7 @@ def create_order(
         order = order_service.create_order(
             db,
             cust_id=cust_id,
-            staff_id=staff_id,
+            staff_id=staff.staff_id,
             order_estimation_date=parse_date(order_estimation_date, "Estimasi selesai"),
             promo_code=promo_code or None,
             pickup_fee=parse_decimal(pickup_fee, "Ongkos jemput", default=Decimal("0")),
@@ -195,7 +200,6 @@ def create_order(
         form = {
             "cust_id": cust_id if customer else "",
             "cust_label": f"{customer.cust_id} - {customer.cust_name}" if customer else "",
-            "staff_id": staff_id,
             "order_estimation_date": order_estimation_date,
             "estimation_manual": bool(order_estimation_date),
             "promo_code": promo_code,
@@ -215,7 +219,7 @@ def create_order(
                 for i in range(max(1, len(service_id)))
             ],
         }
-        return _form_page(request, db, form, error=str(exc), status_code=400)
+        return _form_page(request, db, form, staff, error=str(exc), status_code=400)
     except Exception:
         db.rollback()
         raise

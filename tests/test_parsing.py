@@ -54,4 +54,16 @@ def test_parse_date():
     assert parse_date("2026-11-10", "Estimasi") == date(2026, 11, 10)
     assert parse_date("", "Estimasi") is None
     with pytest.raises(OrderCalculationError):
-        parse_date("10/11/2026", "Estimasi")    
+        parse_date("10/11/2026", "Estimasi")
+
+
+def test_parse_name_dan_phone():
+    from app.services.parsing import parse_name, parse_phone
+    assert parse_name("  Made   Restu ") == "Made Restu"
+    with pytest.raises(OrderCalculationError):
+        parse_name(" a ")
+    assert parse_phone("0812-3456 789") == "08123456789"
+    assert parse_phone("+62 812 3456 789") == "+628123456789"
+    for bad in ("12345", "08ab123456", "1" * 16):
+        with pytest.raises(OrderCalculationError):
+            parse_phone(bad)
