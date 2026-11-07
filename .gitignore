@@ -1,0 +1,6 @@
+.venv/
+.env
+__pycache__/
+*.pyc
+check_db.py
+check_models.py
