@@ -57,6 +57,12 @@ class Customer(Base):
 
     orders: Mapped[list["Order"]] = relationship(back_populates="customer")
 
+    def points_on(self, day: date) -> int:
+        """Saldo poin yang masih berlaku pada tanggal tertentu."""
+        if self.cust_expired_point is not None and self.cust_expired_point < day:
+            return 0
+        return self.cust_point
+
 
 class Staff(Base):
     __tablename__ = "staff"

@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+{% macro service_row(row) %}
+<div class="service-row grid" style="grid-template-columns: 3fr 1fr 2fr auto; align-items:end;">
+  <label>Layanan
+    <select name="service_id">
+      <option value="" data-days="">-- pilih --</option>
+      {% for item in services %}
+      <option value="{{ item.sv.service_id }}" data-days="{{ '' if item.days is none else item.days }}"
+              {% if row.service_id == item.sv.service_id %}selected{% endif %}>
+        {{ item.sv.service_name }} - {{ item.sv.variant }} ({{ item.sv.price | rupiah }}/kg)
+      </option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Qty (kg)
+    <input type="text" inputmode="decimal" name="qty" value="{{ row.qty }}" placeholder="3,5">
+  </label>
+  <label>Catatan
+    <input type="text" name="notes" value="{{ row.notes }}">
+  </label>
+  <button type="button" class="secondary remove-row" title="Hapus baris">Hapus</button>
+</div>
+{% endmacro %}
+{% block title %}Order Baru{% endblock %}
+{% block content %}
+<p><a href="/orders">&larr; Kembali</a></p>
+<h1>Order Baru</h1>
+
+{% if error %}
+<article style="border-left: 4px solid #c62828;">
+  <strong>Order belum disimpan:</strong> {{ error }}
+</article>
+{% endif %}
+
+<form method="post" action="/orders" id="order-form" data-today="{{ today }}" data-default-days="{{ default_days }}">
+
+  <!-- ===== Pelanggan: ketik untuk mencari ===== -->
+  <label>Pelanggan (ketik nama, nomor HP, atau ID)
+    <input type="search" id="cust-search" autocomplete="off"
+           placeholder="mis. stu" value="{{ form.cust_label }}">
+  </label>
+  <input type="hidden" name="cust_id" id="cust-id" value="{{ form.cust_id }}">
+  <ul id="cust-results" style="list-style:none; padding:0; margin-top:-0.5rem;"></ul>
+  <small id="cust-info"></small>
+
+  <div class="grid">
+    <label>Staff
+      <select name="staff_id" required>
+        <option value="">-- pilih --</option>
+        {% for s in staff_list %}
+        <option value="{{ s.staff_id }}" {% if form.staff_id == s.staff_id %}selected{% endif %}>{{ s.staff_name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Estimasi selesai
+      <input type="date" name="order_estimation" id="estimation" value="{{ form.order_estimation }}"
+             data-manual="{{ 'true' if form.estimation_manual else 'false' }}">
+      <small id="estimation-hint">Otomatis: hari ini + layanan terlama. Boleh diubah manual.</small>
+    </label>
+  </div>
+
+  <!-- ===== Layanan: baris dinamis ===== -->
+  <h3>Layanan</h3>
+  <div id="rows">
+    {% for row in form.rows %}
+      {{ service_row(row) }}
+    {% endfor %}
+  </div>
+  <button type="button" class="secondary" id="add-row">+ Tambah layanan</button>
+
+  <div class="grid">
+    <label>Ongkos jemput (Rp)
+      <input type="text" inputmode="numeric" name="pickup_fee" value="{{ form.pickup_fee }}">
+    </label>
+    <label>Ongkos antar (Rp)
+      <input type="text" inputmode="numeric" name="delivery_fee" value="{{ form.delivery_fee }}">
+    </label>
+  </div>
+
+  <div class="grid">
+    <label>Promo
+      <select name="promo_code">
+        <option value="">Tanpa promo</option>
+        {% for p in promos %}
+        <option value="{{ p.promo_code }}" {% if form.promo_code == p.promo_code %}selected{% endif %}>{{ p.promo_code }} - {{ p.promo_name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Poin dipakai (1 poin = Rp1.000)
+      <input type="text" inputmode="numeric" name="points_used" value="{{ form.points_used }}">
+    </label>
+  </div>
+
+  <label>Catatan pelanggan (opsional)
+    <input type="text" name="consument_notes" value="{{ form.consument_notes }}">
+  </label>
+
+  <!-- ===== Pembayaran awal (opsional) ===== -->
+  <fieldset>
+    <legend>Pembayaran awal (opsional)</legend>
+    <div class="grid">
+      <label>Metode
+        <select name="pay_method">
+          <option value="">-- tidak bayar sekarang --</option>
+          {% for m in payment_methods %}
+          <option value="{{ m.payment_method }}" {% if form.pay_method == m.payment_method | string %}selected{% endif %}>{{ m.payment_method_info }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Jumlah (Rp)
+        <input type="text" inputmode="decimal" name="pay_amount" value="{{ form.pay_amount }}" placeholder="kosong jika tidak bayar">
+      </label>
+    </div>
+    <label><input type="checkbox" name="pay_full" value="1" {% if form.pay_full %}checked{% endif %}>
+      Bayar lunas sekarang (jumlah = total tagihan, abaikan kolom jumlah)</label>
+    <small>Sisa tagihan bisa dicicil kapan saja dari halaman order.</small>
+  </fieldset>
+
+  <button type="submit">Simpan order</button>
+</form>
+
+<!-- Pelanggan/layanan dikirim ke JavaScript sebagai data HTML (bukan string JS), aman dari XSS -->
+<template id="row-template">{{ service_row({"service_id": "", "qty": "", "notes": ""}) }}</template>
+
+<script>
+(function () {
+  const form = document.getElementById("order-form");
+  const rows = document.getElementById("rows");
+
+  // ---------- Pelanggan: pencarian saat mengetik (debounce 250 ms) ----------
+  const search = document.getElementById("cust-search");
+  const hidden = document.getElementById("cust-id");
+  const results = document.getElementById("cust-results");
+  const info = document.getElementById("cust-info");
+  let timer = null;
+
+  function showSelected(c) {
+    hidden.value = c.cust_id;
+    search.value = c.cust_id + " - " + c.cust_name;
+    info.textContent = "Poin aktif: " + c.points;
+    results.replaceChildren();
+  }
+
+  search.addEventListener("input", function () {
+    hidden.value = "";            // ketikan baru = pilihan lama dibatalkan
+    info.textContent = "";
+    clearTimeout(timer);
+    const q = search.value.trim();
+    if (!q) { results.replaceChildren(); return; }
+    timer = setTimeout(async function () {
+      const res = await fetch("/customers/search?q=" + encodeURIComponent(q));
+      const data = await res.json();
+      results.replaceChildren();
+      if (data.length === 0) {
+        const li = document.createElement("li");
+        li.textContent = "Tidak ada pelanggan yang cocok.";
+        results.appendChild(li);
+        return;
+      }
+      data.forEach(function (c) {
+        const li = document.createElement("li");
+        const a = document.createElement("a");
+        a.href = "#";
+        a.textContent = c.cust_id + " - " + c.cust_name + " (" + c.cust_phone + ") - poin " + c.points;
+        a.addEventListener("click", function (e) { e.preventDefault(); showSelected(c); });
+        li.appendChild(a);
+        results.appendChild(li);
+      });
+    }, 250);
+  });
+
+  form.addEventListener("submit", function (e) {
+    if (!hidden.value) {
+      e.preventDefault();
+      info.textContent = "Pilih pelanggan dari hasil pencarian dulu.";
+      search.focus();
+    }
+  });
+
+  // ---------- Estimasi otomatis: hari ini + layanan terlama ----------
+  const est = document.getElementById("estimation");
+  const hint = document.getElementById("estimation-hint");
+  const defaultDays = parseInt(form.dataset.defaultDays, 10);
+
+  function addDays(iso, n) {
+    const d = new Date(iso + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function updateEstimation() {
+    if (est.dataset.manual === "true") return;
+    const days = [];
+    rows.querySelectorAll("select[name=service_id]").forEach(function (sel) {
+      const opt = sel.selectedOptions[0];
+      if (opt && opt.value && opt.dataset.days !== "") days.push(parseInt(opt.dataset.days, 10));
+    });
+    const n = days.length ? Math.max.apply(null, days) : defaultDays;
+    est.value = addDays(form.dataset.today, n);
+    hint.textContent = "Otomatis: hari ini + " + n + " hari" +
+      (days.length ? " (layanan terlama)" : " (default)") + ". Boleh diubah manual.";
+  }
+
+  est.addEventListener("input", function () { est.dataset.manual = "true"; hint.textContent = "Diubah manual."; });
+
+  // ---------- Baris layanan dinamis ----------
+  function updateRemoveButtons() {
+    const all = rows.querySelectorAll(".service-row");
+    all.forEach(function (r) { r.querySelector(".remove-row").disabled = all.length === 1; });
+  }
+
+  document.getElementById("add-row").addEventListener("click", function () {
+    const tpl = document.getElementById("row-template");
+    rows.appendChild(tpl.content.cloneNode(true));
+    updateRemoveButtons();
+    updateEstimation();
+  });
+
+  rows.addEventListener("click", function (e) {
+    const btn = e.target.closest(".remove-row");
+    if (!btn) return;
+    btn.closest(".service-row").remove();
+    updateRemoveButtons();
+    updateEstimation();
+  });
+
+  rows.addEventListener("change", function (e) {
+    if (e.target.matches("select[name=service_id]")) updateEstimation();
+  });
+
+  updateRemoveButtons();
+  if (!est.value) updateEstimation();
+  else if (est.dataset.manual !== "true") updateEstimation();
+})();
+</script>
+{% endblock %}
