@@ -48,7 +48,7 @@ CREATE TABLE customer (
   cust_name           VARCHAR(100)  NOT NULL,
   cust_phone          VARCHAR(20)   NOT NULL,
   cust_point          INT UNSIGNED  NOT NULL DEFAULT 0,
-  cust_expired_point  DATE          NULL,
+  cust_point_expired_date  DATE     NULL,
   CONSTRAINT pk_customer PRIMARY KEY (cust_id)
 ) ENGINE=InnoDB;
 
@@ -101,7 +101,7 @@ CREATE TABLE promo (
 CREATE TABLE orders (
   order_id               VARCHAR(10)                NOT NULL,
   order_date             DATE                       NOT NULL,
-  order_estimation       DATE                       NOT NULL,
+  order_estimation_date  DATE                       NOT NULL,
   order_status           TINYINT UNSIGNED           NOT NULL DEFAULT 1,
   cust_id                VARCHAR(10)                NOT NULL,
   staff_id               VARCHAR(10)                NOT NULL,
@@ -113,6 +113,9 @@ CREATE TABLE orders (
   points_used            INT UNSIGNED               NOT NULL DEFAULT 0,
   points_earned          INT UNSIGNED               NOT NULL DEFAULT 0,
   total_price            DECIMAL(12,2)              NOT NULL DEFAULT 0,
+  created_at             DATETIME                   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at             DATETIME                   NOT NULL DEFAULT CURRENT_TIMESTAMP
+                                                    ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT pk_orders PRIMARY KEY (order_id),
   CONSTRAINT fk_orders_status FOREIGN KEY (order_status)
     REFERENCES order_status (order_status) ON UPDATE CASCADE ON DELETE RESTRICT,
@@ -122,7 +125,7 @@ CREATE TABLE orders (
     REFERENCES staff (staff_id) ON UPDATE CASCADE ON DELETE RESTRICT,
   CONSTRAINT fk_orders_promo FOREIGN KEY (promo_code)
     REFERENCES promo (promo_code) ON UPDATE CASCADE ON DELETE RESTRICT,
-  CONSTRAINT ck_orders_dates CHECK (order_estimation >= order_date),
+  CONSTRAINT ck_orders_dates CHECK (order_estimation_date >= order_date),
   CONSTRAINT ck_orders_fees CHECK (pickup_fee >= 0 AND delivery_fee >= 0),
   CONSTRAINT ck_orders_discount CHECK (promo_discount_applied >= 0),
   CONSTRAINT ck_orders_total CHECK (total_price >= 0)
@@ -209,7 +212,7 @@ INSERT INTO service  VALUES ('SE-1', 'Cuci Komplit', '3 hari', 6000),
                             ('SE-2', 'Setrika Saja', '1 hari', 5000);
 INSERT INTO promo    VALUES ('AWALNOV26', 'Promo Awal Bulan November 2026', 2, 10, 0, 10000, TRUE);
 
-INSERT INTO orders (order_id, order_date, order_estimation, order_status, cust_id, staff_id,
+INSERT INTO orders (order_id, order_date, order_estimation_date, order_status, cust_id, staff_id,
                     promo_code, promo_discount_applied, consument_notes, pickup_fee,
                     delivery_fee, points_used, points_earned, total_price)
 VALUES ('O-1', '2026-11-01', '2026-11-04', 1, 'CU-1', 'ST-1',
