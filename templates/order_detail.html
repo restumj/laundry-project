@@ -4,7 +4,7 @@
 <p><a href="/orders">&larr; Kembali</a></p>
 <h1>Order {{ order.order_id }}</h1>
 <p>
-  Tanggal: {{ order.order_date }} (estimasi {{ order.order_estimation }})<br>
+  Tanggal: {{ order.order_date }} (estimasi {{ order.order_estimation_date }})<br>
   Pelanggan: {{ order.customer.cust_name }} ({{ order.customer.cust_phone }})<br>
   Staff: {{ order.staff.staff_name }}<br>
   Status: <strong>{{ order.status.order_status_info }}</strong>
@@ -52,5 +52,8 @@
     {% endfor %}
   </tbody>
 </table>
+
+<a href="/orders/{{ order.order_id }}/pay" role="button" style="margin-bottom: 20px;">Tambah pembayaran</a>
+
 <p>Dibayar: {{ order.total_paid | rupiah }} &middot; <strong>Sisa: {{ order.balance_due | rupiah }}</strong></p>
 {% endblock %}

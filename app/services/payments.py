@@ -10,15 +10,22 @@ from sqlalchemy.orm import Session
 
 from app.models import Order, Payment, PaymentMethod
 from app.services.ids import next_number
-from app.services.pricing import OrderCalculationError, validate_payment_amount
+from app.services.pricing import OrderCalculationError, resolve_payment
 
 
 def add_payment(
-    db: Session, order: Order, method: int, amount: Decimal, pay_date: date
+    db: Session,
+    order: Order,
+    method: int,
+    amount: Decimal,
+    pay_date: date,
+    settle: bool = False,
 ) -> Payment:
+    """Catat pembayaran. Uang lebih dari sisa tagihan -> yang dicatat hanya sisa tagihan
+    (kembalian tidak disimpan). settle=True: sisa kecil dihapuskan, dicatat = seluruh sisa."""
     if db.get(PaymentMethod, method) is None:
         raise OrderCalculationError("Metode pembayaran tidak ditemukan.")
-    validate_payment_amount(amount, order.balance_due)
+    amount, _change = resolve_payment(amount, order.balance_due, settle)
 
     payment = Payment(
         payment_id=f"PA-{next_number(db, Payment.payment_id, 'PA')}",

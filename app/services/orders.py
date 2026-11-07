@@ -3,7 +3,8 @@
 Fungsi di sini TIDAK memanggil commit. Yang memutuskan commit atau rollback
 adalah route, supaya semua perubahan menjadi satu transaksi.
 """
-from datetime import date, timedelta
+from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
 from typing import Optional
 
@@ -14,44 +15,50 @@ from app.models import Customer, Order, OrderDetail, Promo, Service, Staff
 from app.services.estimation import estimate_date
 from app.services.ids import next_number
 from app.services.payments import add_payment
+from app.services.points import points_on, roll_expiry
 from app.services.pricing import (
     LineInput,
     OrderCalculationError,
     PromoRule,
     calculate_order,
+    PriceBreakdown,
     line_subtotal,
 )
 
-POINT_VALIDITY_DAYS = 180   # poin berlaku 6 bulan sejak terakhir mendapat poin (bisa diubah)
 STATUS_PROCESS = 1          # kode di tabel order_status
+STATUS_FINISHED = 2
 
 
-def create_order(
+@dataclass
+class Quote:
+    """Hasil hitung harga (belum disimpan)."""
+    customer: Optional[Customer]
+    services: dict
+    promo: Optional[Promo]
+    line_inputs: list
+    price: PriceBreakdown
+    balance: int          # saldo poin yang masih berlaku hari ini
+
+
+def quote_order(
     db: Session,
     *,
-    cust_id: str,
-    staff_id: str,
-    order_estimation: Optional[date],
+    cust_id: Optional[str],
+    lines: list[tuple[str, Decimal, Optional[str]]],
     promo_code: Optional[str],
     pickup_fee: Decimal,
     delivery_fee: Decimal,
     points_used: int,
-    consument_notes: Optional[str],
-    lines: list[tuple[str, Decimal, Optional[str]]],
-    initial_payment: Optional[tuple[int, Optional[Decimal]]] = None,
-    today: Optional[date] = None,
-) -> Order:
-    today = today or date.today()
-
-    customer = db.get(Customer, cust_id)
-    if customer is None:
+    today: date,
+) -> Quote:
+    """Satu-satunya tempat menghitung harga. Dipakai oleh pratinjau DAN penyimpanan,
+    jadi angka yang dilihat staff pasti sama dengan yang tersimpan."""
+    customer = db.get(Customer, cust_id) if cust_id else None
+    if cust_id and customer is None:
         raise OrderCalculationError("Pilih pelanggan dari hasil pencarian.")
-    if db.get(Staff, staff_id) is None:
-        raise OrderCalculationError("Staff tidak ditemukan.")
     if not lines:
         raise OrderCalculationError("Order harus memuat minimal satu layanan.")
 
-    # --- layanan: harga diambil dari tabel service saat ini (jadi snapshot unit_price)
     wanted = {service_id for service_id, _, _ in lines}
     services = {
         s.service_id: s
@@ -61,13 +68,6 @@ def create_order(
         if service_id not in services:
             raise OrderCalculationError(f"Layanan {service_id} tidak ditemukan.")
 
-    # --- estimasi: kalau kosong, hitung dari layanan yang PALING LAMA
-    if order_estimation is None:
-        order_estimation = estimate_date(today, [services[i].variant for i in wanted])
-    if order_estimation < today:
-        raise OrderCalculationError("Estimasi selesai tidak boleh sebelum tanggal order.")
-
-    # --- promo (boleh kosong)
     promo = None
     rule = None
     if promo_code:
@@ -82,10 +82,11 @@ def create_order(
             is_active=promo.is_active,
         )
 
-    # --- poin: yang sudah lewat tanggal kedaluwarsa dianggap hangus
-    balance = customer.points_on(today)
-    expired = balance == 0 and customer.cust_point > 0   # ada saldo, tapi sudah hangus
-
+    balance = (
+        points_on(customer.cust_point, customer.cust_point_expired_date, today)
+        if customer
+        else 0
+    )
     line_inputs = [
         LineInput(qty=qty, unit_price=services[service_id].price)
         for service_id, qty, _ in lines
@@ -93,6 +94,47 @@ def create_order(
     price = calculate_order(
         line_inputs, pickup_fee, delivery_fee, rule, points_used, balance
     )
+    return Quote(customer, services, promo, line_inputs, price, balance)
+
+
+def create_order(
+    db: Session,
+    *,
+    cust_id: str,
+    staff_id: str,
+    order_estimation_date: Optional[date],
+    promo_code: Optional[str],
+    pickup_fee: Decimal,
+    delivery_fee: Decimal,
+    points_used: int,
+    consument_notes: Optional[str],
+    lines: list[tuple[str, Decimal, Optional[str]]],
+    initial_payment: Optional[tuple[int, Optional[Decimal]]] = None,
+    today: Optional[date] = None,
+) -> Order:
+    today = today or date.today()
+
+    if not cust_id:
+        raise OrderCalculationError("Pilih pelanggan dari hasil pencarian.")
+    if db.get(Staff, staff_id) is None:
+        raise OrderCalculationError("Staff tidak ditemukan.")
+
+    q = quote_order(
+        db, cust_id=cust_id, lines=lines, promo_code=promo_code,
+        pickup_fee=pickup_fee, delivery_fee=delivery_fee,
+        points_used=points_used, today=today,
+    )
+    customer, services, promo, line_inputs, price = (
+        q.customer, q.services, q.promo, q.line_inputs, q.price
+    )
+
+    # --- estimasi: kalau kosong, hitung dari layanan yang PALING LAMA
+    if order_estimation_date is None:
+        order_estimation_date = estimate_date(
+            today, [services[sid].variant for sid, _, _ in lines]
+        )
+    if order_estimation_date < today:
+        raise OrderCalculationError("Estimasi selesai tidak boleh sebelum tanggal order.")
 
     # --- susun objek ORM (belum disimpan ke database)
     order_number = next_number(db, Order.order_id, "O")
@@ -101,7 +143,7 @@ def create_order(
     order = Order(
         order_id=f"O-{order_number}",
         order_date=today,
-        order_estimation=order_estimation,
+        order_estimation_date=order_estimation_date,
         order_status=STATUS_PROCESS,
         cust_id=cust_id,
         staff_id=staff_id,
@@ -127,11 +169,15 @@ def create_order(
         )
 
     # --- saldo poin pelanggan ikut diperbarui dalam transaksi yang sama
-    customer.cust_point = balance - price.points_used + price.points_earned
-    if price.points_earned > 0:
-        customer.cust_expired_point = today + timedelta(days=POINT_VALIDITY_DAYS)
-    elif expired:
-        customer.cust_expired_point = None
+    # Poin yang hangus sudah tidak ikut (q.balance = 0 jika periode lama lewat).
+    # Tanggal kedaluwarsa TIDAK diperpanjang karena order; ia hanya maju per periode
+    # (3 bulan sejak daftar) jika periode lama sudah lewat.
+    customer.cust_point = q.balance - price.points_used + price.points_earned
+    if (
+        customer.cust_point_expired_date is not None
+        and customer.cust_point_expired_date < today
+    ):
+        customer.cust_point_expired_date = roll_expiry(customer.cust_point_expired_date, today)
 
     db.add(order)
     db.flush()   # kirim INSERT sekarang supaya error database muncul di sini
@@ -144,3 +190,18 @@ def create_order(
         if amount > 0:                          # total 0 (lunas oleh poin) -> tidak ada pembayaran
             add_payment(db, order, method, amount, today)
     return order
+
+
+def finish_order(db: Session, order: Order) -> None:
+    """Ubah status PROCESS -> FINISHED, hanya jika tagihan sudah lunas (aturan R12).
+    Trigger di MySQL menjaga aturan yang sama sebagai pengaman terakhir."""
+    if order.order_status == STATUS_FINISHED:
+        raise OrderCalculationError("Order ini sudah selesai.")
+    if order.balance_due > 0:
+        raise OrderCalculationError(
+            "Order belum lunas (sisa Rp"
+            + f"{int(order.balance_due):,}".replace(",", ".")
+            + "). Catat pembayaran dulu."
+        )
+    order.order_status = STATUS_FINISHED
+    db.flush()

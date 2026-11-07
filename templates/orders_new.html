@@ -53,7 +53,7 @@
       </select>
     </label>
     <label>Estimasi selesai
-      <input type="date" name="order_estimation" id="estimation" value="{{ form.order_estimation }}"
+      <input type="date" name="order_estimation_date" id="estimation" value="{{ form.order_estimation_date }}"
              data-manual="{{ 'true' if form.estimation_manual else 'false' }}">
       <small id="estimation-hint">Otomatis: hari ini + layanan terlama. Boleh diubah manual.</small>
     </label>
@@ -94,6 +94,22 @@
   <label>Catatan pelanggan (opsional)
     <input type="text" name="consument_notes" value="{{ form.consument_notes }}">
   </label>
+
+  <!-- ===== Ringkasan harga (dihitung server setiap ada perubahan) ===== -->
+  <article id="summary">
+    <header><strong>Ringkasan harga</strong></header>
+    <p id="summary-msg" style="margin:0;">Isi layanan dan qty untuk melihat total.</p>
+    <table id="summary-table" hidden style="margin:0;">
+      <tr><td>Subtotal layanan</td><td style="text-align:right" id="s-subtotal"></td></tr>
+      <tr><td>Diskon promo</td><td style="text-align:right" id="s-promo"></td></tr>
+      <tr><td>Ongkos jemput + antar</td><td style="text-align:right" id="s-fees"></td></tr>
+      <tr><td>Potongan poin (<span id="s-points"></span> poin)</td><td style="text-align:right" id="s-pointsdisc"></td></tr>
+      <tr><td><strong>TOTAL</strong></td><td style="text-align:right"><strong id="s-total"></strong></td></tr>
+      <tr><td>Poin yang akan didapat</td><td style="text-align:right" id="s-earned"></td></tr>
+      <tr><td>Sisa tagihan setelah pembayaran awal</td><td style="text-align:right" id="s-remaining"></td></tr>
+    </table>
+    <small id="s-maxpoints"></small>
+  </article>
 
   <!-- ===== Pembayaran awal (opsional) ===== -->
   <fieldset>
@@ -148,9 +164,16 @@
     const q = search.value.trim();
     if (!q) { results.replaceChildren(); return; }
     timer = setTimeout(async function () {
-      const res = await fetch("/customers/search?q=" + encodeURIComponent(q));
-      const data = await res.json();
       results.replaceChildren();
+      let data;
+      try {
+        const res = await fetch("/customers/search?q=" + encodeURIComponent(q));
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        data = await res.json();
+      } catch (err) {
+        info.textContent = "Pencarian gagal (" + err.message + "). Lihat log terminal uvicorn.";
+        return;
+      }
       if (data.length === 0) {
         const li = document.createElement("li");
         li.textContent = "Tidak ada pelanggan yang cocok.";
@@ -227,6 +250,73 @@
   rows.addEventListener("change", function (e) {
     if (e.target.matches("select[name=service_id]")) updateEstimation();
   });
+
+  // ---------- Ringkasan harga: minta server menghitung (debounce 300 ms) ----------
+  const msg = document.getElementById("summary-msg");
+  const table = document.getElementById("summary-table");
+  const payAmount = form.querySelector("[name=pay_amount]");
+  const payFull = form.querySelector("[name=pay_full]");
+  let quoteTimer = null;
+  let lastTotal = null;
+
+  function rp(v) {
+    const n = Math.round(parseFloat(v));
+    return "Rp" + n.toLocaleString("id-ID");
+  }
+  function set(id, text) { document.getElementById(id).textContent = text; }
+
+  function renderRemaining() {
+    if (lastTotal === null) return;
+    let paid = 0;
+    if (payFull.checked) paid = lastTotal;
+    else paid = parseFloat((payAmount.value || "0").replace(",", ".")) || 0;
+    set("s-remaining", rp(Math.max(0, lastTotal - paid)));
+  }
+
+  function refreshQuote() {
+    clearTimeout(quoteTimer);
+    quoteTimer = setTimeout(async function () {
+      try {
+        const res = await fetch("/orders/preview", { method: "POST", body: new FormData(form) });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const d = await res.json();
+        if (!d.ok) {
+          lastTotal = null; table.hidden = true; msg.hidden = false;
+          msg.textContent = d.error; return;
+        }
+        if (d.empty) {
+          lastTotal = null; table.hidden = true; msg.hidden = false;
+          msg.textContent = "Isi layanan dan qty untuk melihat total."; return;
+        }
+        msg.hidden = true; table.hidden = false;
+        lastTotal = parseFloat(d.total_price);
+        set("s-subtotal", rp(d.subtotal));
+        set("s-promo", "- " + rp(d.promo_discount));
+        set("s-fees", rp(parseFloat(d.pickup_fee) + parseFloat(d.delivery_fee)));
+        set("s-points", d.points_used);
+        set("s-pointsdisc", "- " + rp(d.points_discount));
+        set("s-total", rp(d.total_price));
+        set("s-earned", d.points_earned + " poin");
+        set("s-maxpoints", "Saldo poin aktif: " + d.points_balance + ". Maksimal dipakai di order ini: " + d.max_points + " poin.");
+        renderRemaining();
+      } catch (err) {
+        lastTotal = null; table.hidden = true; msg.hidden = false;
+        msg.textContent = "Gagal menghitung total (" + err.message + ").";
+      }
+    }, 300);
+  }
+
+  // setiap perubahan di field apa pun pada form -> hitung ulang
+  form.addEventListener("input", refreshQuote);
+  form.addEventListener("change", refreshQuote);
+  rows.addEventListener("click", function (e) { if (e.target.closest(".remove-row")) refreshQuote(); });
+  document.getElementById("add-row").addEventListener("click", refreshQuote);
+  // memilih pelanggan lewat klik tidak memicu event input, jadi dipanggil manual
+  const _showSelected = showSelected;
+  showSelected = function (c) { _showSelected(c); refreshQuote(); };
+  payAmount.addEventListener("input", renderRemaining);
+  payFull.addEventListener("change", renderRemaining);
+  refreshQuote();
 
   updateRemoveButtons();
   if (!est.value) updateEstimation();

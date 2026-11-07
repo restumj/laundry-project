@@ -138,3 +138,47 @@ def validate_payment_amount(amount: Decimal, balance_due: Decimal) -> None:
         raise OrderCalculationError(
             f"Jumlah pembayaran melebihi sisa tagihan ({_rp(balance_due)})."
         )
+
+
+SETTLE_TOLERANCE = Decimal("1000")   # sisa maksimal yang boleh dihapuskan kasir saat "anggap lunas"
+
+
+def resolve_settlement(amount: Decimal, balance_due: Decimal) -> Decimal:
+    """Pembayaran 'anggap lunas': sisa kecil dihapuskan, tagihan dianggap lunas.
+
+    Mengembalikan jumlah yang dicatat = seluruh sisa tagihan (balance_due).
+    Sisa yang dihapuskan (balance_due - amount) tidak boleh melebihi SETTLE_TOLERANCE.
+    """
+    validate_payment_amount(amount, balance_due)
+    forgiven = balance_due - amount
+    if forgiven > SETTLE_TOLERANCE:
+        raise OrderCalculationError(
+            f"Sisa {_rp(forgiven)} terlalu besar untuk dihapuskan "
+            f"(maksimal {_rp(SETTLE_TOLERANCE)}). Catat pembayaran biasa."
+        )
+    return balance_due
+
+
+def resolve_payment(
+    amount: Decimal, balance_due: Decimal, settle: bool = False
+) -> tuple[Decimal, Decimal]:
+    """Tentukan jumlah yang DICATAT dan kembalian dari uang yang diterima kasir.
+
+    - amount >= sisa tagihan (bayar pas/lebih): dicatat = sisa tagihan, selebihnya kembalian
+      (tanpa batas atas).
+    - amount < sisa dan settle=True: sisa kecil dihapuskan (maks SETTLE_TOLERANCE),
+      dicatat = seluruh sisa tagihan.
+    - amount < sisa dan settle=False: dicatat apa adanya (cicilan).
+    Mengembalikan (jumlah_dicatat, kembalian).
+    """
+    if not amount.is_finite() or amount <= 0:
+        raise OrderCalculationError("Jumlah pembayaran harus lebih dari 0.")
+    if amount.as_tuple().exponent < -2:
+        raise OrderCalculationError("Jumlah pembayaran maksimal 2 angka di belakang koma.")
+    if balance_due <= 0:
+        raise OrderCalculationError("Order ini sudah lunas.")
+    if amount >= balance_due:
+        return balance_due, amount - balance_due
+    if settle:
+        return resolve_settlement(amount, balance_due), Decimal("0")
+    return amount, Decimal("0")

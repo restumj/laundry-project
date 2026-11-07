@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Pembayaran {{ order.order_id }}{% endblock %}
+{% block content %}
+<p><a href="/orders/{{ order.order_id }}">&larr; Kembali ke order</a></p>
+<h1>Pembayaran {{ order.order_id }}</h1>
+<p>Pelanggan: {{ order.customer.cust_name }} &middot; Status: {{ order.status.order_status_info }}</p>
+
+{% if error %}
+<article style="border-left: 4px solid #c62828;">
+  <strong>Pembayaran belum disimpan:</strong> {{ error }}
+</article>
+{% endif %}
+
+<table>
+  <tr><td>Total tagihan</td><td style="text-align:right">{{ order.total_price | rupiah }}</td></tr>
+  <tr><td>Sudah dibayar</td><td style="text-align:right">{{ order.total_paid | rupiah }}</td></tr>
+  <tr><td><strong>Sisa tagihan</strong></td><td style="text-align:right"><strong>{{ order.balance_due | rupiah }}</strong></td></tr>
+</table>
+
+{% if order.balance_due > 0 %}
+<form method="post" action="/orders/{{ order.order_id }}/pay">
+  <div class="grid">
+    <label>Metode
+      <select name="method" required>
+        <option value="">-- pilih --</option>
+        {% for m in methods %}
+        <option value="{{ m.payment_method }}" {% if form.method == m.payment_method | string %}selected{% endif %}>{{ m.payment_method_info }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Uang diterima (Rp)
+      <input type="text" inputmode="decimal" name="amount" id="amount" value="{{ form.amount }}" required>
+    </label>
+  </div>
+  <label>
+    <input type="checkbox" name="settle" value="1" id="settle" {% if form.settle %}checked{% endif %}>
+    Anggap lunas dengan pembayaran ini (sisa kecil dihapuskan, maksimal Rp1.000)
+  </label>
+  <small id="settle-info"></small><br>
+  <small>Jika uang diterima lebih dari sisa tagihan, yang dicatat hanya sisa tagihan dan sisanya menjadi kembalian.</small><br>
+  <button type="button" class="secondary" id="pay-rest">Isi sisa tagihan ({{ order.balance_due | rupiah }})</button>
+  <button type="submit">Simpan pembayaran</button>
+</form>
+<script>
+  document.getElementById("pay-rest").addEventListener("click", function () {
+    document.getElementById("amount").value = "{{ order.balance_due }}";
+    updateSettle();
+  });
+  const balance = {{ order.balance_due }};
+  function updateSettle() {
+    const amount = parseFloat((document.getElementById("amount").value || "0").replace(",", "."));
+    const info = document.getElementById("settle-info");
+    const left = balance - amount;
+    const fmt = function (n) { return "Rp" + Math.round(n).toLocaleString("id-ID"); };
+    if (left < 0) info.textContent = "Kembalian: " + fmt(-left) + ". Order akan lunas.";
+    else if (left === 0 && amount > 0) info.textContent = "Pas, order akan lunas.";
+    else if (document.getElementById("settle").checked && left > 0)
+      info.textContent = "Sisa " + fmt(left) + " akan dihapuskan dan order dianggap lunas.";
+    else info.textContent = "";
+  }
+  document.getElementById("amount").addEventListener("input", updateSettle);
+  document.getElementById("settle").addEventListener("change", updateSettle);
+  updateSettle();
+</script>
+{% else %}
+<article><strong>Order ini sudah lunas.</strong></article>
+{% endif %}
+
+{% if order.status.order_status_info == 'PROCESS' %}
+<form method="post" action="/orders/{{ order.order_id }}/finish" style="margin-top:1rem;">
+  <button type="submit" class="contrast">Tandai selesai (FINISHED)</button>
+  <small>Hanya berhasil jika order sudah lunas.</small>
+</form>
+{% endif %}
+
+<h3>Riwayat pembayaran</h3>
+{% if order.payments %}
+<table>
+  <thead><tr><th>ID</th><th>Tanggal</th><th>Metode</th><th style="text-align:right">Jumlah</th></tr></thead>
+  <tbody>
+  {% for pay in order.payments | sort(attribute="payment_id") %}
+    <tr>
+      <td>{{ pay.payment_id }}</td>
+      <td>{{ pay.payment_date }}</td>
+      <td>{{ pay.method.payment_method_info }}</td>
+      <td style="text-align:right">{{ pay.amount_received | rupiah }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>Belum ada pembayaran.</p>
+{% endif %}
+{% endblock %}

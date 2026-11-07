@@ -202,6 +202,26 @@ END$$
 DELIMITER ;
 
 -- ---------------------------------------------------------------------
+-- EVENT: reset poin kedaluwarsa (setiap hari)
+-- Masa berlaku poin 3 bulan, dihitung sejak tanggal daftar dan berulang:
+-- cust_point_expired_date terisi saat daftar (tanggal daftar + 3 bulan).
+-- Jika tanggal itu sudah lewat: poin direset 0 dan tanggal maju 3 bulan.
+-- Angka 3 harus sama dengan POINT_VALIDITY_MONTHS di app/services/points.py.
+-- Event berjalan jika event_scheduler = ON (tanpa itu, aplikasi tetap benar
+-- karena saldo selalu dicek lagi saat order dibuat).
+-- ---------------------------------------------------------------------
+SET GLOBAL event_scheduler = ON;
+
+CREATE EVENT ev_reset_expired_points
+ON SCHEDULE EVERY 1 DAY
+STARTS (TIMESTAMP(CURRENT_DATE) + INTERVAL 1 DAY + INTERVAL 5 MINUTE)
+DO
+  UPDATE customer
+     SET cust_point = 0,
+         cust_point_expired_date = DATE_ADD(cust_point_expired_date, INTERVAL 3 MONTH)
+   WHERE cust_point_expired_date < CURRENT_DATE;
+
+-- ---------------------------------------------------------------------
 -- DATA DUMMY (sesuai Tahap 3)
 -- Subtotal 21000 + 10500 = 31500; promo 10% = 3150; poin 1 = 1000
 -- total = 31500 + 4000 - 3150 - 1000 = 31350; poin didapat = 3

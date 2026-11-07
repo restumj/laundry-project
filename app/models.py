@@ -1,8 +1,8 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import Boolean, Date, ForeignKey, Numeric, String
+from sqlalchemy import Boolean, Date, ForeignKey, Numeric, String, FetchedValue, func
 from sqlalchemy.dialects.mysql import INTEGER, TINYINT
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -53,13 +53,13 @@ class Customer(Base):
     cust_name: Mapped[str] = mapped_column(String(100))
     cust_phone: Mapped[str] = mapped_column(String(20))
     cust_point: Mapped[int] = mapped_column(INTEGER(unsigned=True), default=0)
-    cust_expired_point: Mapped[Optional[date]] = mapped_column(Date)
+    cust_point_expired_date: Mapped[Optional[date]] = mapped_column(Date)
 
     orders: Mapped[list["Order"]] = relationship(back_populates="customer")
 
     def points_on(self, day: date) -> int:
         """Saldo poin yang masih berlaku pada tanggal tertentu."""
-        if self.cust_expired_point is not None and self.cust_expired_point < day:
+        if self.cust_point_expired_date is not None and self.cust_point_expired_date < day:
             return 0
         return self.cust_point
 
@@ -107,7 +107,7 @@ class Order(Base):
 
     order_id: Mapped[str] = mapped_column(String(10), primary_key=True)
     order_date: Mapped[date] = mapped_column(Date)
-    order_estimation: Mapped[date] = mapped_column(Date)
+    order_estimation_date: Mapped[date] = mapped_column(Date)
     order_status: Mapped[int] = mapped_column(
         TINYINT(unsigned=True), ForeignKey("order_status.order_status"), default=1
     )
@@ -130,6 +130,8 @@ class Order(Base):
         back_populates="order", cascade="all, delete-orphan", passive_deletes=True
     )
     payments: Mapped[list["Payment"]] = relationship(back_populates="order")
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), server_onupdate=FetchedValue())
     @property
     def total_paid(self) -> Decimal:
         return sum((p.amount_received for p in self.payments), Decimal("0"))
