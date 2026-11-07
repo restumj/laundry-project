@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Daftar Order{% endblock %}
+{% block content %}
+<h1>Daftar Order</h1>
+<table>
+  <thead>
+    <tr>
+      <th>Order</th><th>Tanggal</th><th>Pelanggan</th><th>Status</th>
+      <th>Total</th><th>Dibayar</th><th>Sisa</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for o in orders %}
+    <tr>
+      <td><a href="/orders/{{ o.order_id }}">{{ o.order_id }}</a></td>
+      <td>{{ o.order_date }}</td>
+      <td>{{ o.customer.cust_name }}</td>
+      <td>{{ o.status.order_status_info }}</td>
+      <td>{{ o.total_price | rupiah }}</td>
+      <td>{{ o.total_paid | rupiah }}</td>
+      <td>{{ o.balance_due | rupiah }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7">Belum ada order.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

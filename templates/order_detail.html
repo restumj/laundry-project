@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Order {{ order.order_id }}{% endblock %}
+{% block content %}
+<p><a href="/orders">&larr; Kembali</a></p>
+<h1>Order {{ order.order_id }}</h1>
+<p>
+  Tanggal: {{ order.order_date }} (estimasi {{ order.order_estimation }})<br>
+  Pelanggan: {{ order.customer.cust_name }} ({{ order.customer.cust_phone }})<br>
+  Staff: {{ order.staff.staff_name }}<br>
+  Status: <strong>{{ order.status.order_status_info }}</strong>
+</p>
+
+<h3>Layanan</h3>
+<table>
+  <thead><tr><th>Layanan</th><th>Varian</th><th>Qty (kg)</th><th>Harga</th><th>Subtotal</th></tr></thead>
+  <tbody>
+    {% for d in order.details %}
+    <tr>
+      <td>{{ d.service.service_name }}</td>
+      <td>{{ d.service.variant }}</td>
+      <td>{{ d.qty }}</td>
+      <td>{{ d.unit_price | rupiah }}</td>
+      <td>{{ d.sub_price | rupiah }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h3>Rincian biaya</h3>
+<table>
+  <tbody>
+    <tr><td>Ongkos jemput</td><td>{{ order.pickup_fee | rupiah }}</td></tr>
+    <tr><td>Ongkos antar</td><td>{{ order.delivery_fee | rupiah }}</td></tr>
+    <tr>
+      <td>Promo{% if order.promo %} ({{ order.promo.promo_name }}){% endif %}</td>
+      <td>- {{ order.promo_discount_applied | rupiah }}</td>
+    </tr>
+    <tr><td>Poin dipakai ({{ order.points_used }})</td><td>- {{ (order.points_used * 1000) | rupiah }}</td></tr>
+    <tr><th>Total</th><th>{{ order.total_price | rupiah }}</th></tr>
+    <tr><td>Poin didapat</td><td>{{ order.points_earned }}</td></tr>
+  </tbody>
+</table>
+
+<h3>Pembayaran</h3>
+<table>
+  <thead><tr><th>Tanggal</th><th>Metode</th><th>Jumlah</th></tr></thead>
+  <tbody>
+    {% for p in order.payments %}
+    <tr><td>{{ p.payment_date }}</td><td>{{ p.method.payment_method_info }}</td><td>{{ p.amount_received | rupiah }}</td></tr>
+    {% else %}
+    <tr><td colspan="3">Belum ada pembayaran.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p>Dibayar: {{ order.total_paid | rupiah }} &middot; <strong>Sisa: {{ order.balance_due | rupiah }}</strong></p>
+{% endblock %}
