@@ -1,6 +1,6 @@
 <mxfile host="app.diagrams.net">
   <diagram name="Page-1" id="LHvZr-8ALogAFzhwzlI0">
-    <mxGraphModel dx="1241" dy="793" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+    <mxGraphModel dx="1304" dy="833" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -152,7 +152,7 @@
           <mxGeometry height="30" width="160" y="206" as="geometry" />
         </mxCell>
         <mxCell id="n10epHI7OTe8sIggHzZo-58" parent="1" style="swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;align=center;fontSize=14;" value="PAYMENT" vertex="1">
-          <mxGeometry height="206" width="160" x="880" y="590" as="geometry" />
+          <mxGeometry height="176" width="160" x="880" y="590" as="geometry" />
         </mxCell>
         <mxCell id="n10epHI7OTe8sIggHzZo-59" parent="n10epHI7OTe8sIggHzZo-58" style="text;strokeColor=none;fillColor=none;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;whiteSpace=wrap;html=1;" value="payment_id" vertex="1">
           <mxGeometry height="30" width="160" y="26" as="geometry" />
@@ -163,14 +163,11 @@
         <mxCell id="n10epHI7OTe8sIggHzZo-61" parent="n10epHI7OTe8sIggHzZo-58" style="text;strokeColor=none;fillColor=none;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;whiteSpace=wrap;html=1;" value="payment_date" vertex="1">
           <mxGeometry height="30" width="160" y="86" as="geometry" />
         </mxCell>
-        <mxCell id="n10epHI7OTe8sIggHzZo-62" parent="n10epHI7OTe8sIggHzZo-58" style="text;strokeColor=none;fillColor=none;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;whiteSpace=wrap;html=1;" value="promo_value" vertex="1">
+        <mxCell id="n10epHI7OTe8sIggHzZo-63" parent="n10epHI7OTe8sIggHzZo-58" style="text;strokeColor=none;fillColor=none;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;whiteSpace=wrap;html=1;" value="payment_method" vertex="1">
           <mxGeometry height="30" width="160" y="116" as="geometry" />
         </mxCell>
-        <mxCell id="n10epHI7OTe8sIggHzZo-63" parent="n10epHI7OTe8sIggHzZo-58" style="text;strokeColor=none;fillColor=none;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;whiteSpace=wrap;html=1;" value="payment_method" vertex="1">
-          <mxGeometry height="30" width="160" y="146" as="geometry" />
-        </mxCell>
         <mxCell id="n10epHI7OTe8sIggHzZo-64" parent="n10epHI7OTe8sIggHzZo-58" style="text;strokeColor=none;fillColor=none;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;whiteSpace=wrap;html=1;" value="amount_received" vertex="1">
-          <mxGeometry height="30" width="160" y="176" as="geometry" />
+          <mxGeometry height="30" width="160" y="146" as="geometry" />
         </mxCell>
         <mxCell id="n10epHI7OTe8sIggHzZo-66" parent="1" style="swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;align=center;fontSize=14;" value="CUSTOMER" vertex="1">
           <mxGeometry height="176" width="160" x="160" y="720" as="geometry" />
