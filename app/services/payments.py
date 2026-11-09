@@ -28,7 +28,8 @@ def add_payment(
     amount, _change = resolve_payment(amount, order.balance_due, settle)
 
     payment = Payment(
-        payment_id=f"PA-{next_number(db, Payment.payment_id, 'PA')}",
+        # PK gabungan (order_id, payment_id): nomor pembayaran dihitung per order
+        payment_id=f"PA-{next_number(db, Payment.payment_id, 'PA', Payment.order_id == order.order_id)}",
         order_id=order.order_id,
         payment_date=pay_date,
         payment_method=method,

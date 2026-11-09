@@ -139,7 +139,6 @@ def create_order(
 
     # --- susun objek ORM (belum disimpan ke database)
     order_number = next_number(db, Order.order_id, "O")
-    detail_number = next_number(db, OrderDetail.detail_id, "D")
 
     order = Order(
         order_id=f"O-{order_number}",
@@ -160,7 +159,7 @@ def create_order(
     for i, ((service_id, qty, note), line) in enumerate(zip(lines, line_inputs)):
         order.details.append(
             OrderDetail(
-                detail_id=f"D-{detail_number + i}",
+                detail_id=f"D-{i + 1}",   # PK gabungan (order_id, detail_id): nomor dihitung per order
                 service_id=service_id,
                 qty=qty,
                 unit_price=line.unit_price,

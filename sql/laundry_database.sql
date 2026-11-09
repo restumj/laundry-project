@@ -133,6 +133,7 @@ CREATE TABLE orders (
 
 -- ---------------------------------------------------------------------
 -- 6. ORDER_DETAIL  (conjunction table ORDERS - SERVICE)
+--    PK gabungan (order_id, detail_id): detail_id hanya unik di dalam satu order (D-1, D-2, ...)
 --    unit_price = harga saat transaksi (snapshot, R7)
 -- ---------------------------------------------------------------------
 CREATE TABLE order_detail (
@@ -143,7 +144,7 @@ CREATE TABLE order_detail (
   unit_price  DECIMAL(12,2)  NOT NULL,
   notes       VARCHAR(255)   NULL,
   sub_price   DECIMAL(12,2)  NOT NULL,
-  CONSTRAINT pk_order_detail PRIMARY KEY (detail_id),
+  CONSTRAINT pk_order_detail PRIMARY KEY (order_id, detail_id),
   CONSTRAINT fk_detail_orders FOREIGN KEY (order_id)
     REFERENCES orders (order_id) ON UPDATE CASCADE ON DELETE CASCADE,
   CONSTRAINT fk_detail_service FOREIGN KEY (service_id)
@@ -155,6 +156,7 @@ CREATE TABLE order_detail (
 
 -- ---------------------------------------------------------------------
 -- 7. PAYMENT  (satu order boleh dibayar berkali-kali, R11)
+--    PK gabungan (order_id, payment_id): payment_id hanya unik di dalam satu order (PA-1, PA-2, ...)
 -- ---------------------------------------------------------------------
 CREATE TABLE payment (
   payment_id       VARCHAR(10)                        NOT NULL,
@@ -162,7 +164,7 @@ CREATE TABLE payment (
   payment_date     DATE                               NOT NULL,
   payment_method   TINYINT UNSIGNED                   NOT NULL,
   amount_received  DECIMAL(12,2)                      NOT NULL,
-  CONSTRAINT pk_payment PRIMARY KEY (payment_id),
+  CONSTRAINT pk_payment PRIMARY KEY (order_id, payment_id),
   CONSTRAINT fk_payment_method FOREIGN KEY (payment_method)
     REFERENCES payment_method (payment_method) ON UPDATE CASCADE ON DELETE RESTRICT,
   CONSTRAINT fk_payment_orders FOREIGN KEY (order_id)
@@ -174,7 +176,7 @@ CREATE TABLE payment (
 -- INDEX tambahan (FK sudah otomatis diindeks InnoDB; ini untuk query umum)
 -- ---------------------------------------------------------------------
 CREATE INDEX idx_customer_phone   ON customer (cust_phone);
-CREATE INDEX idx_orders_status    ON orders (order_status);
+-- CREATE INDEX idx_orders_status    ON orders (order_status);
 CREATE INDEX idx_orders_date      ON orders (order_date);
 CREATE INDEX idx_payment_date     ON payment (payment_date);
 
