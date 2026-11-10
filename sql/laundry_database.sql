@@ -168,7 +168,7 @@ CREATE TABLE payment (
   CONSTRAINT fk_payment_method FOREIGN KEY (payment_method)
     REFERENCES payment_method (payment_method) ON UPDATE CASCADE ON DELETE RESTRICT,
   CONSTRAINT fk_payment_orders FOREIGN KEY (order_id)
-    REFERENCES orders (order_id) ON UPDATE CASCADE ON DELETE RESTRICT,
+    REFERENCES orders (order_id) ON UPDATE CASCADE ON DELETE CASCADE,
   CONSTRAINT ck_payment_amount CHECK (amount_received > 0)
 ) ENGINE=InnoDB;
 
