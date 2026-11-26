@@ -12,7 +12,7 @@ CREATE DATABASE laundry_db
 USE laundry_db;
 
 -- ---------------------------------------------------------------------
--- 0. TABEL REFERENSI (lookup) - dibuat lebih dulu karena dirujuk FK
+-- 0. TABEL REFERENSI: PROMO_TYPE, ORDER_STATUS, PAYMENT_METHOD
 -- ---------------------------------------------------------------------
 CREATE TABLE promo_type (
   promo_type       TINYINT UNSIGNED NOT NULL,
@@ -35,7 +35,7 @@ CREATE TABLE payment_method (
   CONSTRAINT uq_payment_method_info UNIQUE (payment_method_info)
 ) ENGINE=InnoDB;
 
--- Kode angka dipakai di tabel utama; nama lengkap ada di kolom *_info
+-- Default nilai
 INSERT INTO promo_type VALUES (1, 'NOMINAL'), (2, 'PERCENT');
 INSERT INTO order_status VALUES (1, 'PROCESS'), (2, 'FINISHED');
 INSERT INTO payment_method VALUES (1, 'CASH'), (2, 'QRIS'), (3, 'TRANSFER');
@@ -63,7 +63,7 @@ CREATE TABLE staff (
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------
--- 3. SERVICE  (price = tarif terkini, boleh berubah)
+-- 3. SERVICE
 -- ---------------------------------------------------------------------
 CREATE TABLE service (
   service_id    VARCHAR(10)    NOT NULL,
@@ -96,7 +96,7 @@ CREATE TABLE promo (
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------
--- 5. ORDERS  (ORDER adalah reserved word MySQL)
+-- 5. ORDERS
 -- ---------------------------------------------------------------------
 CREATE TABLE orders (
   order_id               VARCHAR(10)                NOT NULL,
@@ -205,12 +205,6 @@ DELIMITER ;
 
 -- ---------------------------------------------------------------------
 -- EVENT: reset poin kedaluwarsa (setiap hari)
--- Masa berlaku poin 3 bulan, dihitung sejak tanggal daftar dan berulang:
--- cust_point_expired_date terisi saat daftar (tanggal daftar + 3 bulan).
--- Jika tanggal itu sudah lewat: poin direset 0 dan tanggal maju 3 bulan.
--- Angka 3 harus sama dengan POINT_VALIDITY_MONTHS di app/services/points.py.
--- Event berjalan jika event_scheduler = ON (tanpa itu, aplikasi tetap benar
--- karena saldo selalu dicek lagi saat order dibuat).
 -- ---------------------------------------------------------------------
 SET GLOBAL event_scheduler = ON;
 
@@ -224,23 +218,18 @@ DO
    WHERE cust_point_expired_date < CURRENT_DATE;
 
 -- ---------------------------------------------------------------------
--- DATA DUMMY (sesuai Tahap 3)
--- Subtotal 21000 + 10500 = 31500; promo 10% = 3150; poin 1 = 1000
--- total = 31500 + 4000 - 3150 - 1000 = 31350; poin didapat = 3
+-- DATA DUMMY
 -- ---------------------------------------------------------------------
 INSERT INTO customer VALUES ('CU-1', 'Restu', '123456789', 5, '2026-11-30');
 INSERT INTO staff    VALUES ('ST-1', 'Jeysen', '123456790');
 INSERT INTO service  VALUES ('SE-1', 'Cuci Komplit', '3 hari', 6000),
                             ('SE-2', 'Setrika Saja', '1 hari', 5000);
 INSERT INTO promo    VALUES ('AWALNOV26', 'Promo Awal Bulan November 2026', 2, 10, 0, 10000, TRUE);
-
 INSERT INTO orders (order_id, order_date, order_estimation_date, order_status, cust_id, staff_id,
                     promo_code, promo_discount_applied, consument_notes, pickup_fee,
                     delivery_fee, points_used, points_earned, total_price)
 VALUES ('O-1', '2026-11-01', '2026-11-04', 1, 'CU-1', 'ST-1',
         'AWALNOV26', 3150, NULL, 4000, 0, 1, 3, 31350);
-
 INSERT INTO order_detail VALUES ('D-1', 'O-1', 'SE-1', 3.5, 6000, NULL, 21000),
                                 ('D-2', 'O-1', 'SE-2', 2.1, 5000, NULL, 10500);
-
 INSERT INTO payment VALUES ('PA-1', 'O-1', '2026-11-01', 1, 20000);
